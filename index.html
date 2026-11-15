@@ -77,19 +77,20 @@
     </style>
 </head>
 <body class="relative w-screen h-screen m-0 p-0 flex items-center justify-center">
-    <!-- Retro TV HUD Zaman Kodu (Sol Üst - Tıklanabilir Müzik Kontrolü) -->
-    <div id="hudTime" class="absolute top-6 left-6 text-pink-500/70 text-xs sm:text-sm tv-hud z-20 opacity-0 transition-opacity duration-700 cursor-pointer hover:text-pink-400" title="Müziği Başlat / Durdur">
-        PLAY ► 00:00 / 08:00 [TV-GIRL EDITION]
-    </div>
-
-    <!-- Ses Kontrol Göstergesi (Sağ Üst) -->
     <!-- CRT Tarama Çizgileri ve Vignette -->
     <div class="crt-overlay"></div>
     <div class="vignette"></div>
 
-    <!-- Etkileşimli Oynat / Durdur Düğmesi (Sol Üst) -->
-    <button id="audioToggleBtn" class="absolute top-6 left-6 text-pink-500 hover:text-pink-400 text-sm sm:text-base tv-hud z-20 opacity-0 transition-opacity duration-700 bg-black/40 px-3 py-1.5 rounded-lg border border-pink-500/30 cursor-pointer flex items-center gap-2">
-        <span id="audioIcon" class="text-lg">▶</span> <span id="audioText" class="tracking-widest">PLAY</span>
+    <!-- Etkileşimli Oynat / Durdur Düğmesi (Sol Üst) - Üçgen/Çizgi ikonları -->
+    <button id="audioToggleBtn" class="absolute top-6 left-6 text-pink-500 hover:text-pink-400 text-sm sm:text-base tv-hud z-20 opacity-0 transition-opacity duration-700 bg-black/40 px-3.5 py-2 rounded-lg border border-pink-500/30 cursor-pointer flex items-center justify-center shadow-lg" title="Müziği Başlat / Durdur">
+        <!-- Play Simgesi (Üçgen) -->
+        <svg id="playIconSvg" class="w-5 h-5 fill-current" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z"/>
+        </svg>
+        <!-- Pause Simgesi (İki Çizgi - Başlangıçta Gizli) -->
+        <svg id="pauseIconSvg" class="w-5 h-5 fill-current hidden" viewBox="0 0 24 24">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+        </svg>
     </button>
 
     <!-- Merkezdeki Beyaz Düğme -->
@@ -101,8 +102,11 @@
         </button>
     </div>
 
-    <!-- Yerel Ses Dosyası Oynatıcı -->
-    <audio id="bgAudio" src="melody.m4a" preload="auto" loop></audio>
+    <!-- Yerel Ses Dosyası Oynatıcı (GitHub Pages uyumlu yol) -->
+    <audio id="bgAudio" preload="auto" loop>
+        <source src="./melody.m4a" type="audio/mp4">
+        <source src="melody.m4a" type="audio/mp4">
+    </audio>
 
     <!-- Çarpışma Sonrası Tekrar Oynat Düğmesi -->
     <div id="replayContainer" class="absolute bottom-10 inset-x-0 flex justify-center z-10 opacity-0 pointer-events-none transition-opacity duration-700">
@@ -125,8 +129,18 @@
         const replayContainer = document.getElementById('replayContainer');
         const bgAudio = document.getElementById('bgAudio');
         const audioToggleBtn = document.getElementById('audioToggleBtn');
-        const audioIcon = document.getElementById('audioIcon');
-        const audioText = document.getElementById('audioText');
+        const playIconSvg = document.getElementById('playIconSvg');
+        const pauseIconSvg = document.getElementById('pauseIconSvg');
+
+        // GitHub Pages ses kaynağını kesinleştirmek için mutlak/göreli adres kontrolü
+        try {
+            const audioUrl = new URL('melody.m4a', window.location.href).href;
+            if (bgAudio.src !== audioUrl) {
+                bgAudio.src = audioUrl;
+            }
+        } catch(e) {
+            console.log("Ses URL ayarlanırken hata:", e);
+        }
 
         // Ekran Boyutları
         let width = window.innerWidth;
@@ -142,18 +156,16 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Animasyon Durumları (Çarpışma süresi 9 saniye olarak ayarlandı)
+        // Animasyon Durumları (Çarpışma süresi tam 9 saniye)
         const STATE = {
             IDLE: 0,
-            APPROACHING: 1, // Yaklaşma ve bakışma (0s - 8.0s)
-            EMBRACING: 2,   // Son milisaniye sarılma (8.0s - 9.0s)
-            DUST_EXPLOSION: 3 // Toza dönüşüm
+            APPROACHING: 1, 
+            EMBRACING: 2,   
+            DUST_EXPLOSION: 3 
         };
 
         let currentState = STATE.IDLE;
-        let approachDuration = 8000;   // 8 saniye yaklaşma
-        let embraceDuration = 1000;    // 1 saniye sarılma
-        let totalParticles = 100;      // Performans için 100 parçacık
+        let totalParticles = 100;      // Performans optimizasyonlu 100 parçacık
 
         let leftEye = {
             x: width * 0.15,
@@ -173,7 +185,6 @@
         let shockwaves = [];
         let flashAlpha = 0;
         let animStartTime = 0;
-        let isAudioPlaying = false;
 
         function resetPositions() {
             leftEye.x = width * 0.15;
@@ -182,26 +193,33 @@
             rightEye.y = height * 0.5;
         }
 
+        // Ses İkonlarını Güncelleme Fonksiyonu
+        function updateAudioButtonUI(isPlaying) {
+            if (isPlaying) {
+                playIconSvg.classList.add('hidden');
+                pauseIconSvg.classList.remove('hidden');
+            } else {
+                playIconSvg.classList.remove('hidden');
+                pauseIconSvg.classList.add('hidden');
+            }
+        }
+
         // Ses Oynat / Durdur Toggle Kontrolü
         audioToggleBtn.addEventListener('click', () => {
             if (bgAudio.paused) {
                 bgAudio.play().then(() => {
-                    isAudioPlaying = true;
-                    audioIcon.textContent = "⏸";
-                    audioText.textContent = "PAUSE";
+                    updateAudioButtonUI(true);
                 }).catch(e => {
                     console.log("Ses oynatılamadı:", e);
                 });
             } else {
                 bgAudio.pause();
-                isAudioPlaying = false;
-                audioIcon.textContent = "▶";
-                audioText.textContent = "PLAY";
+                updateAudioButtonUI(false);
             }
         });
 
         /**
-         * Animasyonu başlatır
+         * Animasyonu ve Müziği Başlatır
          */
         function startSequence() {
             startBtn.classList.add('hidden-btn');
@@ -212,15 +230,14 @@
             
             audioToggleBtn.classList.remove('opacity-0');
 
-            // Müziği başlat
+            // Müziği baştan çal
             if (bgAudio) {
                 bgAudio.currentTime = 0;
                 bgAudio.play().then(() => {
-                    isAudioPlaying = true;
-                    audioIcon.textContent = "⏸";
-                    audioText.textContent = "PAUSE";
+                    updateAudioButtonUI(true);
                 }).catch(e => {
-                    console.log("Ses oynatma hatası:", e);
+                    console.log("GitHub Pages Otomatik Oynatma Engeli:", e);
+                    updateAudioButtonUI(false);
                 });
             }
 
@@ -401,7 +418,7 @@
             let centerX = width / 2;
             let centerY = height / 2;
 
-            if (elapsed < 9000) { // Toplam 9 saniyelik çarpışma kurgusu
+            if (elapsed < 9000) { // Çarpışma süresi 9 saniye
                 let progress = elapsed / 9000;
                 let easedProgress = Math.pow(progress, 3.2);
 
