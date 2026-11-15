@@ -9,30 +9,94 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                scroll-behavior: auto !important;
+                transition-duration: 0.01ms !important;
+                animation-duration: 0.01ms !important;
+            }
+        }
+
         body {
             font-family: 'Inter', sans-serif;
             background-color: #020205;
             overflow: hidden;
-            user-select: none;
-            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         /* CRT Tarama Çizgileri / Lo-Fi TV Girl Efekti */
         .crt-overlay {
             position: absolute;
             inset: 0;
-            background: linear-gradient(
-                rgba(18, 16, 16, 0) 50%, 
-                rgba(0, 0, 0, 0.35) 50%
-            ), linear-gradient(
-                90deg,
-                rgba(255, 0, 0, 0.03),
-                rgba(0, 255, 0, 0.01),
-                rgba(0, 0, 255, 0.03)
-            );
-            background-size: 100% 3px, 6px 100%;
+            overflow: hidden;
             pointer-events: none;
             z-index: 5;
+            opacity: 0.72;
+            background:
+                repeating-linear-gradient(
+                    to bottom,
+                    rgba(0, 0, 0, 0.00) 0px,
+                    rgba(0, 0, 0, 0.00) 2px,
+                    rgba(0, 0, 0, 0.28) 3px,
+                    rgba(0, 0, 0, 0.28) 4px
+                ),
+                linear-gradient(
+                    90deg,
+                    rgba(255, 35, 120, 0.035),
+                    transparent 28%,
+                    rgba(70, 120, 255, 0.035) 72%,
+                    rgba(70, 120, 255, 0.02)
+                );
+            background-size: 100% 4px, 100% 100%;
+            animation: crt-flicker 7s steps(1, end) infinite;
+        }
+
+        .crt-overlay::before,
+        .crt-overlay::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .crt-overlay::before {
+            background:
+                repeating-linear-gradient(
+                    90deg,
+                    rgba(255, 0, 80, 0.025) 0px,
+                    rgba(255, 0, 80, 0.025) 1px,
+                    transparent 1px,
+                    transparent 3px
+                ),
+                linear-gradient(
+                    to bottom,
+                    transparent 0%,
+                    rgba(255, 255, 255, 0.025) 48%,
+                    transparent 52%,
+                    transparent 100%
+                );
+            mix-blend-mode: screen;
+            opacity: 0.65;
+        }
+
+        .crt-overlay::after {
+            background: radial-gradient(
+                ellipse at center,
+                transparent 45%,
+                rgba(0, 0, 0, 0.22) 100%
+            );
+            box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.38);
+        }
+
+        @keyframes crt-flicker {
+            0%, 93%, 96%, 100% { opacity: 0.72; }
+            94% { opacity: 0.58; }
+            95% { opacity: 0.78; }
+            97% { opacity: 0.66; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .crt-overlay { animation: none; }
         }
 
         /* Vignette / Köşe Karartma */
@@ -101,7 +165,7 @@
     <div class="absolute top-6 left-6 z-20">
         <button id="audioToggleBtn" 
                 aria-label="Müziği Başlat/Durdur"
-                class="flex items-center justify-center w-12 h-12 rounded-full bg-black/40 border border-pink-500/30 text-pink-400 backdrop-blur-md shadow-[0_0_15px_rgba(255,46,147,0.2)] hover:bg-pink-500/20 hover:border-pink-400 hover:text-white transition-all cursor-pointer">
+                class="flex items-center justify-center w-12 h-12 bg-transparent border-0 text-pink-400 hover:text-white hover:drop-shadow-[0_0_10px_rgba(255,46,147,0.9)] transition-all cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-pink-400">
             <!-- Üçgen Play İkonu -->
             <svg id="playIcon" class="w-5 h-5 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M8 5v14l11-7z"/>
@@ -161,6 +225,31 @@
         const playIcon = document.getElementById('playIcon');
         const pauseIcon = document.getElementById('pauseIcon');
 
+        // Müzik 20. saniyede fade-out'a girer, 4 saniyede tamamen susar.
+        const AUDIO_FADE_START = 20;
+        const AUDIO_FADE_DURATION = 4;
+        let audioFadeFinished = false;
+
+        function updateAudioFade() {
+            if (audioFadeFinished || bgAudio.paused) return;
+
+            const elapsed = bgAudio.currentTime;
+            if (elapsed >= AUDIO_FADE_START) {
+                const progress = Math.min(
+                    1,
+                    (elapsed - AUDIO_FADE_START) / AUDIO_FADE_DURATION
+                );
+                bgAudio.volume = Math.max(0, 1 - progress);
+
+                if (progress >= 1) {
+                    bgAudio.volume = 0;
+                    bgAudio.pause();
+                    audioFadeFinished = true;
+                    updateAudioButtonIcons();
+                }
+            }
+        }
+
         // GitHub Pages ses kaynağını kesinleştirmek için mutlak/göreli adres kontrolü
         try {
             const audioUrl = new URL('melody.m4a', window.location.href).href;
@@ -178,9 +267,10 @@
         function resizeCanvas() {
             width = window.innerWidth;
             height = window.innerHeight;
-            canvas.width = width * window.devicePixelRatio;
-            canvas.height = height * window.devicePixelRatio;
-            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            canvas.width = Math.floor(width * dpr);
+            canvas.height = Math.floor(height * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         }
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
@@ -215,6 +305,28 @@
         let flashAlpha = 0;
         let animStartTime = 0;
         let isFirstPlay = true;
+
+        // Fare/dokunmatik konumunu takip ederek göz bebeklerini yönlendir.
+        let pointerX = width / 2;
+        let pointerY = height / 2;
+        let pointerActive = false;
+        let lastFrameTime = 0;
+        let frameScale = 1;
+
+        function getLookAngle(eyeX, eyeY, fallbackAngle = 0) {
+            if (!pointerActive) return fallbackAngle;
+            return Math.atan2(pointerY - eyeY, pointerX - eyeX);
+        }
+
+        window.addEventListener('pointermove', (event) => {
+            pointerX = event.clientX;
+            pointerY = event.clientY;
+            pointerActive = true;
+        }, { passive: true });
+
+        window.addEventListener('pointerleave', () => {
+            pointerActive = false;
+        });
 
         // Zamanı durdurma/devam ettirme (pause/resume) için sayaçlar
         let isPaused = false;
@@ -278,6 +390,8 @@
                 replayContainer.classList.add('opacity-0', 'pointer-events-none');
 
                 if (bgAudio) {
+                    audioFadeFinished = false;
+                    bgAudio.volume = 1;
                     bgAudio.currentTime = 0;
                     bgAudio.play().catch(e => console.log("Otomatik oynatma engeli:", e));
                     updateAudioButtonIcons();
@@ -298,15 +412,14 @@
         replayBtn.addEventListener('click', () => {
             isFirstPlay = true;
             isPaused = false;
-            startContainer.classList.remove('opacity-0', 'pointer-events-none');
-            replayContainer.classList.remove('opacity-100', 'pointer-events-auto');
-            replayContainer.classList.add('opacity-0', 'pointer-events-none');
-            currentState = STATE.IDLE;
             if (bgAudio) {
                 bgAudio.pause();
                 bgAudio.currentTime = 0;
-                updateAudioButtonIcons();
+                bgAudio.volume = 1;
             }
+            audioFadeFinished = false;
+            currentState = STATE.IDLE;
+            handleTriggerAction();
         });
 
         /**
@@ -459,14 +572,19 @@
         function animateLoop(timestamp) {
             requestAnimationFrame(animateLoop);
 
+            const delta = lastFrameTime ? Math.min(timestamp - lastFrameTime, 40) : 16.67;
+            lastFrameTime = timestamp;
+            frameScale = delta / 16.67;
+            updateAudioFade();
+
             ctx.fillStyle = '#020205';
             ctx.fillRect(0, 0, width, height);
 
             if (currentState === STATE.IDLE) {
                 let time = timestamp * 0.002;
                 let idleY = height * 0.5 + Math.sin(time) * 8;
-                drawLashEye(width * 0.15, idleY, 1.0, 0);
-                drawFlatEye(width * 0.85, idleY, 1.0, Math.PI);
+                drawLashEye(width * 0.15, idleY, 1.0, getLookAngle(width * 0.15, idleY, 0));
+                drawFlatEye(width * 0.85, idleY, 1.0, getLookAngle(width * 0.85, idleY, Math.PI));
                 return;
             }
 
@@ -502,8 +620,8 @@
                 ctx.stroke();
                 ctx.restore();
 
-                drawLashEye(leftEye.x, leftEye.y, 1.0, 0);
-                drawFlatEye(rightEye.x, rightEye.y, 1.0, Math.PI);
+                drawLashEye(leftEye.x, leftEye.y, 1.0, getLookAngle(leftEye.x, leftEye.y, 0));
+                drawFlatEye(rightEye.x, rightEye.y, 1.0, getLookAngle(rightEye.x, rightEye.y, Math.PI));
 
                 if (progress > 0.75) {
                     let armProgress = (progress - 0.75) / 0.25;
@@ -517,8 +635,8 @@
                 }
 
                 shockwaves.forEach(sw => {
-                    sw.radius += (sw.maxRadius - sw.radius) * 0.06;
-                    sw.alpha *= 0.95;
+                    sw.radius += (sw.maxRadius - sw.radius) * (1 - Math.pow(0.94, frameScale));
+                    sw.alpha *= Math.pow(0.95, frameScale);
 
                     ctx.save();
                     ctx.beginPath();
@@ -534,16 +652,16 @@
                     ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
                     ctx.fillRect(0, 0, width, height);
                     ctx.restore();
-                    flashAlpha *= 0.85;
+                    flashAlpha *= Math.pow(0.85, frameScale);
                 }
 
                 ctx.save();
                 dustParticles.forEach(p => {
-                    p.x += p.vx;
-                    p.y += p.vy + p.gravity;
-                    p.vx += p.swirl;
-                    p.vy += 0.01;
-                    p.alpha -= p.decay;
+                    p.x += p.vx * frameScale;
+                    p.y += (p.vy + p.gravity) * frameScale;
+                    p.vx += p.swirl * frameScale;
+                    p.vy += 0.01 * frameScale;
+                    p.alpha -= p.decay * frameScale;
 
                     if (p.alpha > 0) {
                         ctx.beginPath();
@@ -561,6 +679,20 @@
                 }
             }
         }
+
+        let hiddenAt = null;
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                hiddenAt = performance.now();
+            } else if (hiddenAt !== null) {
+                const hiddenDuration = performance.now() - hiddenAt;
+                if (currentState !== STATE.IDLE && !isPaused) {
+                    animStartTime += hiddenDuration;
+                }
+                lastFrameTime = 0;
+                hiddenAt = null;
+            }
+        });
 
         requestAnimationFrame(animateLoop);
     </script>
