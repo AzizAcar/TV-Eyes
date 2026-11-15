@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Pink & Blue Afterglow — Lo-fi TV</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #020205;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* CRT EKRAN EFEKTİ */
+
+        .crt-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 5;
+            opacity: 0.75;
+
+            background:
+                linear-gradient(
+                    rgba(18, 16, 16, 0) 50%,
+                    rgba(0, 0, 0, 0.35) 50%
+                ),
+                linear-gradient(
+                    90deg,
+                    rgba(255, 0, 0, 0.035),
+                    rgba(0, 255, 0, 0.012),
+                    rgba(0, 0, 255, 0.04)
+                );
+
+            background-size: 100% 3px, 6px 100%;
+
+            animation: crtFlicker 0.16s infinite;
+        }
+
+        .crt-overlay::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+
+            background:
+                radial-gradient(
+                    ellipse at center,
+                    transparent 35%,
+                    rgba(0, 0, 0, 0.3) 75%,
+                    rgba(0, 0, 0, 0.75) 100%
+                );
+
+            opacity: 0.8;
+        }
+
+        @keyframes crtFlicker {
+            0% { opacity: 0.72; }
+            50% { opacity: 0.78; }
+            100% { opacity: 0.72; }
+        }
+
+        .vignette {
+            position: absolute;
+            inset: 0;
+
+            background:
+                radial-gradient(
+                    circle at center,
+                    transparent 35%,
+                    rgba(0, 0, 0, 0.4) 70%,
+                    rgba(0, 0, 0, 0.92) 110%
+                );
+
+            pointer-events: none;
+            z-index: 4;
+        }
+
+        /* BUTONLAR */
+
+        .white-trigger-btn {
+            background: #fff;
+            color: #09090b;
+
+            box-shadow:
+                0 0 25px rgba(255, 255, 255, 0.5),
+                0 0 50px rgba(255, 46, 147, 0.3);
+
+            transition: all 0.3s ease;
+        }
+
+        .white-trigger-btn:hover {
+            transform: scale(1.08);
+
+            box-shadow:
+                0 0 35px rgba(255, 255, 255, 0.8),
+                0 0 70px rgba(0, 80, 208, 0.5);
+        }
+
+        .white-trigger-btn:active {
+            transform: scale(0.96);
+        }
+
+        /* MÜZİK İKONU */
+
+        .hud-control-btn {
+            background: transparent;
+            border: none;
+            outline: none;
+
+            color: #ff65ad;
+
+            width: 48px;
+            height: 48px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            cursor: pointer;
+
+            transition:
+                color 0.3s ease,
+                transform 0.3s ease,
+                filter 0.3s ease;
+        }
+
+        .hud-control-btn:hover {
+            color: #75aaff;
+            transform: scale(1.12);
+            filter: drop-shadow(0 0 10px #ff2e93);
+        }
+
+        .gradient-text {
+            background: linear-gradient(
+                135deg,
+                #ff2e93 0%,
+                #e5c9ff 50%,
+                #0050d0 100%
+            );
+
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .crt-overlay {
+                animation: none;
+            }
+        }
+    </style>
+</head>
+
+<body class="relative w-screen h-screen m-0 p-0 flex items-center justify-center">
+
+    <!-- CRT VE KARARTMA -->
+    <div class="crt-overlay"></div>
+    <div class="vignette"></div>
+
+    <!-- MÜZİK KONTROLÜ -->
+    <div class="absolute top-6 left-6 z-20">
+
+        <button
+            id="audioToggleBtn"
+            class="hud-control-btn"
+            aria-label="Müziği Başlat veya Durdur"
+        >
+
+            <svg
+                id="playIcon"
+                class="w-5 h-5 translate-x-0.5"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+            >
+                <path d="M8 5v14l11-7z"/>
+            </svg>
+
+            <svg
+                id="pauseIcon"
+                class="w-5 h-5 hidden"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+            >
+                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+            </svg>
+
+        </button>
+
+    </div>
+
+    <!-- BAŞLAT -->
+    <div
+        id="startContainer"
+        class="absolute inset-0 flex items-center justify-center z-10 pointer-events-none"
+    >
+
+        <button
+            id="startBtn"
+            class="white-trigger-btn pointer-events-auto px-10 py-4 rounded-full font-semibold text-base sm:text-lg tracking-wider uppercase cursor-pointer"
+        >
+            START
+        </button>
+
+    </div>
+
+    <!-- MÜZİK -->
+    <audio id="bgAudio" preload="auto" loop>
+        <source src="./melody.m4a" type="audio/mp4">
+        <source src="melody.m4a" type="audio/mp4">
+    </audio>
+
+    <!-- TEKRAR İZLE -->
+    <div
+        id="replayContainer"
+        class="absolute bottom-20 inset-x-0 flex justify-center z-10 opacity-0 pointer-events-none transition-opacity duration-700"
+    >
+
+        <button
+            id="replayBtn"
+            class="white-trigger-btn px-8 py-3 rounded-full font-semibold text-sm sm:text-base tracking-wider uppercase cursor-pointer"
+        >
+            REPLAY
+        </button>
+
+    </div>
+
+    <!-- ALT YAZI -->
+    <div class="absolute bottom-6 inset-x-0 flex justify-center z-10 pointer-events-none px-4">
+
+        <p class="text-center text-xs sm:text-sm tracking-wider font-light">
+
+            <span class="text-pink-400 font-semibold drop-shadow-[0_0_8px_rgba(255,46,147,0.8)]">
+                Cigarettes out the window
+            </span>
+
+            <span class="text-white/60 mx-2">—</span>
+
+            <span class="text-blue-400 font-semibold drop-shadow-[0_0_8px_rgba(0,80,208,0.8)]">
+                TV Girl
+            </span>
+
+        </p>
+
+    </div>
+
+    <!-- CANVAS -->
+    <canvas
+        id="animCanvas"
+        class="absolute inset-0 w-full h-full block z-0"
+    ></canvas>
+
+
+<script>
+
+    /* =========================================
+       DOM ELEMENTLERİ
+    ========================================= */
+
+    const canvas = document.getElementById('animCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const startBtn = document.getElementById('startBtn');
+    const startContainer = document.getElementById('startContainer');
+
+    const replayBtn = document.getElementById('replayBtn');
+    const replayContainer = document.getElementById('replayContainer');
+
+    const bgAudio = document.getElementById('bgAudio');
+
+    const audioToggleBtn = document.getElementById('audioToggleBtn');
+    const playIcon = document.getElementById('playIcon');
+    const pauseIcon = document.getElementById('pauseIcon');
+
+
+    /* =========================================
+       SES AYARLARI
+    ========================================= */
+
+    let musicFadeStarted = false;
+
+    const MUSIC_FADE_START = 20;
+    const MUSIC_FADE_DURATION = 4;
+
+    const ORIGINAL_VOLUME = 1;
+
+    bgAudio.volume = ORIGINAL_VOLUME;
+
+    try {
+        const audioUrl = new URL(
+            'melody.m4a',
+            window.location.href
+        ).href;
+
+        bgAudio.src = audioUrl;
+
+    } catch (e) {
+        console.log("Ses URL hatası:", e);
+    }
+
+
+    function updateMusicFade() {
+
+        if (bgAudio.paused) return;
+
+        const currentTime = bgAudio.currentTime;
+
+        if (currentTime >= MUSIC_FADE_START) {
+
+            musicFadeStarted = true;
+
+            const progress = Math.min(
+                1,
+                (currentTime - MUSIC_FADE_START) / MUSIC_FADE_DURATION
+            );
+
+            bgAudio.volume = ORIGINAL_VOLUME * (1 - progress);
+
+            if (progress >= 1) {
+                bgAudio.volume = 0;
+                bgAudio.pause();
+            }
+        }
+    }
+
+
+    function resetMusic() {
+
+        musicFadeStarted = false;
+
+        bgAudio.pause();
+        bgAudio.currentTime = 0;
+        bgAudio.volume = ORIGINAL_VOLUME;
+
+    }
+
+
+    /* =========================================
+       CANVAS BOYUTLANDIRMA
+    ========================================= */
+
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    function resizeCanvas() {
+
+        width = window.innerWidth;
+        height = window.innerHeight;
+
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+
+    resizeCanvas();
+
+
+    /* =========================================
+       MOUSE TAKİBİ
+    ========================================= */
+
+    let mouseX = width / 2;
+    let mouseY = height / 2;
+
+    window.addEventListener('mousemove', (e) => {
+
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+
+    });
+
+
+    /* =========================================
+       ANİMASYON DURUMLARI
+    ========================================= */
+
+    const STATE = {
+
+        IDLE: 0,
+        APPROACHING: 1,
+        EMBRACING: 2,
+        DUST_EXPLOSION: 3
+
+    };
+
+    let currentState = STATE.IDLE;
+
+    let totalParticles = 150;
+
+    let leftEye = {
+        x: width * 0.15,
+        y: height * 0.5,
+        color: '#9b004f',
+        glowColor: 'rgba(255,46,147,0.6)'
+    };
+
+    let rightEye = {
+        x: width * 0.85,
+        y: height * 0.5,
+        color: '#003594',
+        glowColor: 'rgba(0,80,208,0.6)'
+    };
+
+
+    let dustParticles = [];
+    let shockwaves = [];
+
+    let flashAlpha = 0;
+
+    let animStartTime = 0;
+
+    let isFirstPlay = true;
+    let isPaused = false;
+
+    let pauseTimestamp = 0;
+
+    let lastFrameTime = 0;
+
+
+    /* =========================================
+       POZİSYONLARI SIFIRLA
+    ========================================= */
+
+    function resetPositions() {
+
+        leftEye.x = width * 0.15;
+        leftEye.y = height * 0.5;
+
+        rightEye.x = width * 0.85;
+        rightEye.y = height * 0.5;
+
+    }
+
+
+    /* =========================================
+       SES İKONLARI
+    ========================================= */
+
+    function updateAudioButtonIcons() {
+
+        if (bgAudio.paused) {
+
+            playIcon.classList.remove('hidden');
+            pauseIcon.classList.add('hidden');
+
+        } else {
+
+            playIcon.classList.add('hidden');
+            pauseIcon.classList.remove('hidden');
+
+        }
+
+    }
+
+
+    /* =========================================
+       SES VE ANİMASYON DURDURMA
+    ========================================= */
+
+    audioToggleBtn.addEventListener('click', () => {
+
+        if (isFirstPlay) {
+
+            handleTriggerAction();
+            return;
+
+        }
+
+        if (!isPaused) {
+
+            isPaused = true;
+
+            bgAudio.pause();
+
+            pauseTimestamp = performance.now();
+
+            updateAudioButtonIcons();
+
+        } else {
+
+            isPaused = false;
+
+            bgAudio.play().catch(e => {
+                console.log("Ses devam ettirilemedi:", e);
+            });
+
+            animStartTime += performance.now() - pauseTimestamp;
+
+            updateAudioButtonIcons();
+
+        }
+
+    });
+
+
+    /* =========================================
+       ANİMASYONU BAŞLAT
+    ========================================= */
+
+    function handleTriggerAction() {
+
+        if (!isFirstPlay) return;
+
+        isFirstPlay = false;
+        isPaused = false;
+
+        startContainer.classList.add(
+            'opacity-0',
+            'pointer-events-none'
+        );
+
+        replayContainer.classList.remove(
+            'opacity-100',
+            'pointer-events-auto'
+        );
+
+        replayContainer.classList.add(
+            'opacity-0',
+            'pointer-events-none'
+        );
+
+        resetMusic();
+
+        bgAudio.play().catch(e => {
+            console.log("Otomatik oynatma engeli:", e);
+        });
+
+        updateAudioButtonIcons();
+
+        dustParticles = [];
+        shockwaves = [];
+
+        flashAlpha = 0;
+
+        resetPositions();
+
+        currentState = STATE.APPROACHING;
+
+        animStartTime = performance.now();
+
+        lastFrameTime = 0;
+
+    }
+
+
+    startBtn.addEventListener('click', handleTriggerAction);
+
+
+    /* =========================================
+       TEKRAR OYNAT
+    ========================================= */
+
+    replayBtn.addEventListener('click', () => {
+
+        isFirstPlay = true;
+        isPaused = false;
+
+        resetMusic();
+
+        currentState = STATE.IDLE;
+
+        dustParticles = [];
+        shockwaves = [];
+
+        flashAlpha = 0;
+
+        resetPositions();
+
+        updateAudioButtonIcons();
+
+        handleTriggerAction();
+
+    });
+
+
+    /* =========================================
+       PATLAMA PARÇACIKLARI
+    ========================================= */
+
+    function triggerShatterIntoDust(x, y) {
+
+        dustParticles = [];
+
+        for (let i = 0; i < totalParticles; i++) {
+
+            const angle = Math.random() * Math.PI * 2;
+
+            const speed = Math.random() * 6 + 1;
+
+            const isPink = i < totalParticles / 2;
+
+            dustParticles.push({
+
+                x: x,
+                y: y,
+
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+
+                radius: 1.5 + Math.random() * 2.5,
+
+                color: isPink
+                    ? '#ff2e93'
+                    : '#0050d0',
+
+                alpha: 1,
+
+                decay: 0.004 + Math.random() * 0.008,
+
+                gravity: 0.01,
+
+                swirl: (Math.random() - 0.5) * 0.1
+
+            });
+
+        }
+
+
+        // PEMBE ŞOK DALGASI
+
+        shockwaves.push({
+
+            x,
+            y,
+
+            radius: 10,
+
+            maxRadius: Math.max(width, height) * 0.58,
+
+            alpha: 0.75,
+
+            color: '255,46,147',
+
+            lineWidth: 2.5
+
+        });
+
+
+        // MAVİ ŞOK DALGASI
+
+        shockwaves.push({
+
+            x,
+            y,
+
+            radius: 4,
+
+            maxRadius: Math.max(width, height) * 0.42,
+
+            alpha: 0.65,
+
+            color: '55,125,255',
+
+            lineWidth: 1.5
+
+        });
+
+
+        flashAlpha = 0.65;
+
+    }
+
+
+    /* =========================================
+       PEMBE GÖZ
+    ========================================= */
+
+    function drawLashEye(x, y, scale, lookAngle) {
+
+        ctx.save();
+
+        ctx.translate(x, y);
+        ctx.scale(scale, scale);
+
+        ctx.shadowBlur = 25;
+        ctx.shadowColor = '#ff2e93';
+
+        ctx.beginPath();
+
+        ctx.ellipse(
+            0,
+            0,
+            45,
+            30,
+            0,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fillStyle = '#0a0508';
+        ctx.fill();
+
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#ff2e93';
+
+        ctx.stroke();
+
+
+        // KİRPİKLER
+
+        ctx.strokeStyle = '#ff2e93';
+        ctx.lineWidth = 2.5;
+
+        const lashes = [-25, -12, 0, 12, 25];
+
+        lashes.forEach((lx, idx) => {
+
+            ctx.beginPath();
+
+            ctx.moveTo(lx, -26);
+
+            const tipX = lx + (idx - 2) * 4;
+            const tipY = -42 - Math.abs(idx - 2) * 2;
+
+            ctx.lineTo(tipX, tipY);
+
+            ctx.stroke();
+
+        });
+
+
+        const pupilOffsetX = Math.cos(lookAngle) * 12;
+        const pupilOffsetY = Math.sin(lookAngle) * 4;
+
+        ctx.beginPath();
+
+        ctx.arc(
+            pupilOffsetX,
+            pupilOffsetY,
+            15,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fillStyle = '#ff2e93';
+        ctx.fill();
+
+
+        ctx.beginPath();
+
+        ctx.arc(
+            pupilOffsetX + 2,
+            pupilOffsetY,
+            7,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fillStyle = '#000000';
+        ctx.fill();
+
+        ctx.restore();
+
+    }
+
+
+    /* =========================================
+       MAVİ GÖZ
+    ========================================= */
+
+    function drawFlatEye(x, y, scale, lookAngle) {
+
+        ctx.save();
+
+        ctx.translate(x, y);
+        ctx.scale(scale, scale);
+
+        ctx.shadowBlur = 25;
+        ctx.shadowColor = '#0050d0';
+
+        ctx.beginPath();
+
+        ctx.ellipse(
+            0,
+            0,
+            45,
+            28,
+            0,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fillStyle = '#02050b';
+        ctx.fill();
+
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#003594';
+        ctx.strokeStyle = '#168cff';
+        ctx.stroke();
+
+
+        ctx.beginPath();
+
+        ctx.moveTo(-35, -38);
+        ctx.lineTo(35, -38);
+
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#0050d0';
+
+        ctx.stroke();
+
+
+        const pupilOffsetX = Math.cos(lookAngle) * 12;
+        const pupilOffsetY = Math.sin(lookAngle) * 4;
+
+        ctx.beginPath();
+
+        ctx.arc(
+            pupilOffsetX,
+            pupilOffsetY,
+            15,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fillStyle = '#0050d0';
+        ctx.fill();
+
+
+        ctx.beginPath();
+
+        ctx.arc(
+            pupilOffsetX - 2,
+            pupilOffsetY,
+            7,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fillStyle = '#000000';
+        ctx.fill();
+
+        ctx.restore();
+
+    }
+
+
+    /* =========================================
+       SARILMA ANİMASYONU
+    ========================================= */
+
+    function drawEmbracingArms(lx, ly, rx, ry, progress) {
+
+        ctx.save();
+
+        ctx.lineCap = 'round';
+
+        // PEMBE KOL
+
+        ctx.strokeStyle = '#ff2e93';
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#ff2e93';
+
+        ctx.lineWidth = 4;
+
+        ctx.beginPath();
+
+        ctx.moveTo(lx + 35, ly + 10);
+
+        ctx.quadraticCurveTo(
+            lx + 70 + progress * 40,
+            ly + 30,
+            (lx + rx) / 2 - 10,
+            ly + 5
+        );
+
+        ctx.stroke();
+
+
+        // MAVİ KOL
+
+        ctx.strokeStyle = '#0050d0';
+        ctx.shadowColor = '#0050d0';
+
+        ctx.beginPath();
+
+        ctx.moveTo(rx - 35, ry + 10);
+
+        ctx.quadraticCurveTo(
+            rx - 70 - progress * 40,
+            ry + 30,
+            (lx + rx) / 2 + 10,
+            ry + 5
+        );
+
+        ctx.stroke();
+
+        ctx.restore();
+
+    }
+
+
+    /* =========================================
+       PATLAMA SONRASI LO-FI ATMOSFER
+    ========================================= */
+
+    /* PATLAMA SONRASI: DAHA ANİME TARZINDA, SADE NEON GÖZLER */
+    function drawAfterglowGirlEye(x, y, scale, lookAngle) { ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.shadowColor = '#ff2e93'; ctx.shadowBlur = 19; ctx.beginPath(); ctx.moveTo(-55, 1); ctx.bezierCurveTo(-38, -29, 5, -38, 39, -13); ctx.quadraticCurveTo(49, -5, 55, 0); ctx.bezierCurveTo(31, 28, -17, 32, -55, 1); ctx.closePath(); ctx.fillStyle = '#050207'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#ff2e93'; ctx.stroke(); ctx.beginPath(); ctx.moveTo(-55, 1); ctx.bezierCurveTo(-37, -30, 7, -39, 40, -13); ctx.quadraticCurveTo(49, -5, 55, 0); ctx.strokeStyle = '#ff78bd'; ctx.lineWidth = 4; ctx.stroke(); ctx.beginPath(); ctx.moveTo(-42, -16); ctx.quadraticCurveTo(-50, -31, -57, -37); ctx.moveTo(-25, -25); ctx.lineTo(-31, -39); ctx.moveTo(-5, -31); ctx.lineTo(-7, -44); ctx.moveTo(17, -27); ctx.lineTo(23, -39); ctx.strokeStyle = '#ff2e93'; ctx.lineWidth = 3; ctx.stroke(); const pupilX = 2 + Math.cos(lookAngle) * 7; const pupilY = Math.sin(lookAngle) * 7; ctx.beginPath(); ctx.ellipse(pupilX, pupilY, 17, 23, -0.08, 0, Math.PI * 2); ctx.fillStyle = '#ff2e93'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#ff9acb'; ctx.stroke(); ctx.beginPath(); ctx.ellipse(pupilX, pupilY + 1, 9, 15, 0, 0, Math.PI * 2); ctx.fillStyle = '#050207'; ctx.fill(); ctx.beginPath(); ctx.moveTo(-48, 13); ctx.quadraticCurveTo(-12, 34, 30, 18); ctx.strokeStyle = '#ff2e93'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore(); }
+    function drawAfterglowBoyEye(x, y, scale, lookAngle) { ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.shadowColor = '#1677ff'; ctx.shadowBlur = 19; ctx.beginPath(); ctx.moveTo(-55, -5); ctx.lineTo(-35, -24); ctx.quadraticCurveTo(5, -38, 43, -17); ctx.lineTo(55, -8); ctx.quadraticCurveTo(31, 20, -8, 25); ctx.quadraticCurveTo(-39, 22, -55, -5); ctx.closePath(); ctx.fillStyle = '#020711'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#1677ff'; ctx.stroke(); ctx.beginPath(); ctx.moveTo(-57, -8); ctx.lineTo(-34, -27); ctx.quadraticCurveTo(7, -42, 45, -18); ctx.lineTo(56, -10); ctx.strokeStyle = '#58a0ff'; ctx.lineWidth = 4; ctx.stroke(); ctx.beginPath(); ctx.moveTo(-35, -28); ctx.lineTo(5, -38); ctx.lineTo(43, -25); ctx.strokeStyle = '#1677ff'; ctx.lineWidth = 3.5; ctx.stroke(); const pupilX = 1 + Math.cos(lookAngle) * 7; const pupilY = -1 + Math.sin(lookAngle) * 7; ctx.beginPath(); ctx.ellipse(pupilX, pupilY, 16, 22, 0.08, 0, Math.PI * 2); ctx.fillStyle = '#1677ff'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#8abaff'; ctx.stroke(); ctx.beginPath(); ctx.ellipse(pupilX, pupilY + 1, 8, 14, 0, 0, Math.PI * 2); ctx.fillStyle = '#020711'; ctx.fill(); ctx.beginPath(); ctx.moveTo(-42, 9); ctx.quadraticCurveTo(-8, 29, 34, 12); ctx.strokeStyle = '#1677ff'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore(); }
+    function drawAfterglow(timestamp, elapsed) {
+
+        const t = timestamp * 0.001;
+
+        const fadeIn = Math.min(
+            1,
+            Math.max(0, (elapsed - 9800) / 1700)
+        );
+
+
+        /* PEMBE-MAVİ ARKA PLAN IŞIĞI */
+
+        ctx.save();
+
+        ctx.globalAlpha = 0.22 * fadeIn;
+
+        const glow = ctx.createRadialGradient(
+            width * 0.5,
+            height * 0.48,
+            8,
+            width * 0.5,
+            height * 0.48,
+            Math.max(width, height) * 0.62
+        );
+
+        glow.addColorStop(
+            0,
+            'rgba(255,35,145,0.25)'
+        );
+
+        glow.addColorStop(
+            0.48,
+            'rgba(35,75,180,0.15)'
+        );
+
+        glow.addColorStop(
+            1,
+            'rgba(0,0,0,0)'
+        );
+
+        ctx.fillStyle = glow;
+
+        ctx.fillRect(
+            0,
+            0,
+            width,
+            height
+        );
+
+        ctx.restore();
+
+
+        /* SÜZÜLEN NEON IŞIKLAR */
+
+        for (let i = 0; i < 24; i++) {
+
+            const seed = i * 91.7;
+
+            const x = (
+                seed * 13 +
+                t * (8 + (i % 3) * 4) +
+                (mouseX - width / 2) * 0.015
+            ) % (width + 100) - 50;
+
+            const y =
+                height * (
+                    0.12 + ((i * 37) % 76) / 100
+                ) +
+                Math.sin(t * 0.45 + i) * 16 +
+                (mouseY - height / 2) * 0.01;
+
+            const radius = 2 + (i % 4) * 1.8;
+
+            const pink = i % 2 === 0;
+
+            ctx.save();
+
+            ctx.globalAlpha =
+                (0.12 + 0.12 * (
+                    0.5 + 0.5 * Math.sin(t * 1.3 + i)
+                )) * fadeIn;
+
+            ctx.shadowBlur = 20;
+
+            ctx.shadowColor = pink
+                ? '#ff2e93'
+                : '#397dff';
+
+            ctx.fillStyle = pink
+                ? '#ff6ab5'
+                : '#6ca5ff';
+
+            ctx.beginPath();
+
+            ctx.arc(
+                x,
+                y,
+                radius,
+                0,
+                Math.PI * 2
+            );
+
+            ctx.fill();
+
+            ctx.restore();
+
+        }
+
+
+        /* YILDIZ PARILTILARI */
+
+        for (let i = 0; i < 14; i++) {
+
+            const x = (i * 137.5 + width * 0.08) % width;
+
+            const y = (i * 83.3 + height * 0.13) % height;
+
+            const pulse =
+                0.35 + 0.65 * (
+                    0.5 + 0.5 * Math.sin(t * 1.7 + i * 2)
+                );
+
+            const size = 2 + (i % 3);
+
+            ctx.save();
+
+            ctx.globalAlpha = pulse * 0.48 * fadeIn;
+
+            ctx.strokeStyle = i % 2
+                ? '#78aaff'
+                : '#ff78bd';
+
+            ctx.lineWidth = 1;
+
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = ctx.strokeStyle;
+
+            ctx.beginPath();
+
+            ctx.moveTo(x - size * 2, y);
+            ctx.lineTo(x + size * 2, y);
+
+            ctx.moveTo(x, y - size * 2);
+            ctx.lineTo(x, y + size * 2);
+
+            ctx.stroke();
+
+            ctx.restore();
+
+        }
+
+        if (elapsed >= 10400) { ctx.save(); ctx.globalAlpha = Math.min(1, (elapsed - 10400) / 1400); const eyeScale = Math.min(1.15, Math.max(0.62, width / 1100)); drawAfterglowGirlEye(width * 0.19, height * 0.59, eyeScale, Math.atan2(mouseY - height * 0.59, mouseX - width * 0.19)); drawAfterglowBoyEye(width * 0.81, height * 0.59, eyeScale, Math.atan2(mouseY - height * 0.59, mouseX - width * 0.81)); ctx.restore(); }
+        /* ORTADA BELİREN YAZI */
+
+        const titleAlpha = Math.min(
+            0.78,
+            Math.max(0, (elapsed - 10400) / 1400)
+        ) * (
+            1 - Math.min(
+                0.22,
+                Math.max(0, (elapsed - 18000) / 8000)
+            )
+        );
+
+
+        if (titleAlpha > 0) {
+
+            ctx.save();
+
+            ctx.globalAlpha = titleAlpha;
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            ctx.font = `600 ${
+                Math.max(13, Math.min(19, width * 0.022))
+            }px Inter, sans-serif`;
+
+            ctx.letterSpacing = '4px';
+
+            ctx.shadowBlur = 18;
+            ctx.shadowColor = 'rgba(255,46,147,0.65)';
+
+            const titleGradient = ctx.createLinearGradient(
+                width * 0.34,
+                0,
+                width * 0.66,
+                0
+            );
+
+            titleGradient.addColorStop(0, '#ff75b9');
+            titleGradient.addColorStop(0.52, '#e6d8ff');
+            titleGradient.addColorStop(1, '#75aaff');
+
+            ctx.fillStyle = titleGradient;
+
+            ctx.fillText(
+                'SOMEWHERE BETWEEN PINK & BLUE',
+                width / 2,
+                height * 0.72
+            );
+
+            ctx.restore();
+
+        }
+
+    }
+
+
+    /* =========================================
+       ANA ANİMASYON DÖNGÜSÜ
+    ========================================= */
+
+    function animateLoop(timestamp) {
+
+        requestAnimationFrame(animateLoop);
+
+        let deltaTime = lastFrameTime
+            ? Math.min((timestamp - lastFrameTime) / 16.67, 2)
+            : 1;
+
+        lastFrameTime = timestamp;
+
+
+        ctx.fillStyle = '#020205';
+
+        ctx.fillRect(
+            0,
+            0,
+            width,
+            height
+        );
+
+
+        /* BAŞLANGIÇ DURUMU */
+
+        if (currentState === STATE.IDLE) {
+
+            const time = timestamp * 0.002;
+
+            const idleY =
+                height * 0.5 + Math.sin(time) * 8;
+
+            drawAfterglowGirlEye(
+                width * 0.15,
+                idleY,
+                1,
+                Math.atan2(mouseY - idleY, mouseX - width * 0.15)
+            );
+
+            drawAfterglowBoyEye(
+                width * 0.85,
+                idleY,
+                1,
+                Math.atan2(mouseY - idleY, mouseX - width * 0.85)
+            );
+
+            return;
+
+        }
+
+
+        /* DURAKLATMA */
+
+        if (isPaused) {
+            return;
+        }
+
+
+        const elapsed = timestamp - animStartTime;
+
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+
+        /* MÜZİK FADE */
+
+        updateMusicFade();
+
+
+        /* =====================================
+           GÖZLERİN YAKLAŞMASI
+        ===================================== */
+
+        if (elapsed < 8400) {
+
+            const progress = Math.min(
+                elapsed / 9000,
+                1
+            );
+
+            const easedProgress = Math.pow(
+                progress,
+                3.2
+            );
+
+            const startDist = width * 0.35;
+
+            leftEye.x =
+                centerX - startDist * (1 - easedProgress);
+
+            rightEye.x =
+                centerX + startDist * (1 - easedProgress);
+
+
+            const floatY = Math.sin(elapsed * 0.003) * 6;
+
+            leftEye.y = centerY + floatY;
+            rightEye.y = centerY - floatY;
+
+
+            /* FREKANS BAĞLARI */
+
+            ctx.save();
+
+            ctx.strokeStyle = progress > 0.7
+                ? 'rgba(255,46,147,0.4)'
+                : 'rgba(0,80,208,0.2)';
+
+            ctx.lineWidth = 1.5;
+
+            ctx.setLineDash([4, 8]);
+
+            ctx.beginPath();
+
+            ctx.moveTo(
+                leftEye.x + 40,
+                leftEye.y
+            );
+
+            ctx.lineTo(
+                rightEye.x - 40,
+                rightEye.y
+            );
+
+            ctx.stroke();
+
+            ctx.restore();
+
+
+            drawAfterglowGirlEye(
+                leftEye.x,
+                leftEye.y,
+                1,
+                Math.atan2(mouseY - leftEye.y, mouseX - leftEye.x)
+            );
+
+            drawAfterglowBoyEye(
+                rightEye.x,
+                rightEye.y,
+                1,
+                Math.atan2(mouseY - rightEye.y, mouseX - rightEye.x)
+            );
+
+
+            /* SARILMA */
+
+            if (progress > 0.75) {
+
+                const armProgress =
+                    (progress - 0.75) / 0.25;
+
+                drawEmbracingArms(
+                    leftEye.x,
+                    leftEye.y,
+                    rightEye.x,
+                    rightEye.y,
+                    armProgress
+                );
+
+            }
+
+        }
+
+
+        /* =====================================
+           PATLAMA
+        ===================================== */
+
+        else {
+
+            if (currentState !== STATE.DUST_EXPLOSION) {
+
+                currentState = STATE.DUST_EXPLOSION;
+
+                triggerShatterIntoDust(
+                    centerX,
+                    centerY
+                );
+
+            }
+
+
+            /* ŞOK DALGALARI */
+
+            shockwaves.forEach(sw => {
+
+                sw.radius += (
+                    (sw.maxRadius - sw.radius) *
+                    0.06 * deltaTime
+                );
+
+                sw.alpha *= Math.pow(0.95, deltaTime);
+
+                ctx.save();
+
+                ctx.beginPath();
+
+                ctx.arc(
+                    sw.x,
+                    sw.y,
+                    sw.radius,
+                    0,
+                    Math.PI * 2
+                );
+
+                ctx.strokeStyle =
+                    `rgba(${sw.color}, ${sw.alpha})`;
+
+                ctx.lineWidth = sw.lineWidth;
+
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = `rgba(${sw.color},0.5)`;
+
+                ctx.stroke();
+
+                ctx.restore();
+
+            });
+
+
+            shockwaves = shockwaves.filter(
+                sw => sw.alpha > 0.01
+            );
+
+
+            /* BEYAZ PATLAMA IŞIĞI */
+
+            if (flashAlpha > 0) {
+
+                ctx.save();
+
+                ctx.fillStyle =
+                    `rgba(255,255,255,${flashAlpha})`;
+
+                ctx.fillRect(
+                    0,
+                    0,
+                    width,
+                    height
+                );
+
+                ctx.restore();
+
+                flashAlpha *= Math.pow(0.85, deltaTime);
+
+            }
+
+
+            /* TOZ PARÇACIKLARI */
+
+            ctx.save();
+
+            dustParticles.forEach(p => {
+
+                p.x += p.vx * deltaTime;
+
+                p.y += (
+                    p.vy + p.gravity
+                ) * deltaTime;
+
+                p.vx += p.swirl * deltaTime;
+
+                p.vy += 0.01 * deltaTime;
+
+                p.alpha -= p.decay * deltaTime;
+
+
+                if (p.alpha > 0) {
+
+                    ctx.beginPath();
+
+                    ctx.arc(
+                        p.x,
+                        p.y,
+                        p.radius,
+                        0,
+                        Math.PI * 2
+                    );
+
+                    ctx.fillStyle = p.color;
+
+                    ctx.globalAlpha = Math.max(
+                        0,
+                        p.alpha
+                    );
+
+                    ctx.fill();
+
+                }
+
+            });
+
+            ctx.restore();
+
+
+            /* TOZ TEMİZLEME */
+
+            dustParticles = dustParticles.filter(
+                p => p.alpha > 0
+            );
+
+
+            /* PATLAMA SONRASI ATMOSFER */
+
+            drawAfterglow(
+                timestamp,
+                elapsed
+            );
+
+            /* TEKRAR İZLE */
+
+            if (elapsed >= 14500) {
+
+                replayContainer.classList.remove(
+                    'opacity-0',
+                    'pointer-events-none'
+                );
+
+                replayContainer.classList.add(
+                    'opacity-100',
+                    'pointer-events-auto'
+                );
+
+            }
+
+        }
+
+    }
+
+    /* =========================================
+       SAYFA GÖRÜNÜRLÜĞÜ
+    ========================================= */
+
+    document.addEventListener(
+        'visibilitychange',
+        () => {
+
+            if (document.hidden && !isFirstPlay && !isPaused) {
+
+                isPaused = true;
+
+                bgAudio.pause();
+
+                pauseTimestamp = performance.now();
+
+                updateAudioButtonIcons();
+
+            }
+
+        }
+    );
+
+    /* =========================================
+       BAŞLAT
+    ========================================= */
+
+    requestAnimationFrame(animateLoop);
+
+</script>
+
+</body>
+</html>
