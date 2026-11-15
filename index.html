@@ -68,11 +68,27 @@
             transition: all 0.5s ease-out;
         }
 
-        /* Retro Zaman Kodu & Altyazı */
-        .tv-hud {
-            font-family: monospace;
-            letter-spacing: 0.15em;
-            text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+        /* Sol Üst Oynat / Durdur Düğmesi Tasarımı */
+        .hud-control-btn {
+            background: rgba(10, 5, 12, 0.7);
+            border: 1px solid rgba(255, 46, 147, 0.4);
+            color: #ffffff;
+            backdrop-filter: blur(4px);
+            transition: all 0.25s ease;
+        }
+
+        .hud-control-btn:hover {
+            border-color: rgba(0, 80, 208, 0.8);
+            box-shadow: 0 0 15px rgba(255, 46, 147, 0.3);
+            transform: scale(1.05);
+        }
+
+        /* TV Girl Esinlenmeli Pembe-Mavi Gradyan Metin Efekti */
+        .gradient-text {
+            background: linear-gradient(135deg, #ff2e93 0%, #0050d0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(255, 46, 147, 0.25);
         }
     </style>
 </head>
@@ -81,19 +97,23 @@
     <div class="crt-overlay"></div>
     <div class="vignette"></div>
 
-    <!-- Etkileşimli Oynat / Durdur Düğmesi (Sol Üst) - Üçgen/Çizgi ikonları -->
-    <button id="audioToggleBtn" class="absolute top-6 left-6 text-pink-500 hover:text-pink-400 text-sm sm:text-base tv-hud z-20 opacity-0 transition-opacity duration-700 bg-black/40 px-3.5 py-2 rounded-lg border border-pink-500/30 cursor-pointer flex items-center justify-center shadow-lg" title="Müziği Başlat / Durdur">
-        <!-- Play Simgesi (Üçgen) -->
-        <svg id="playIconSvg" class="w-5 h-5 fill-current" viewBox="0 0 24 24">
-            <path d="M8 5v14l11-7z"/>
-        </svg>
-        <!-- Pause Simgesi (İki Çizgi - Başlangıçta Gizli) -->
-        <svg id="pauseIconSvg" class="w-5 h-5 fill-current hidden" viewBox="0 0 24 24">
-            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-        </svg>
-    </button>
+    <!-- Sol üst köşe ses oynat/durdur düğmesi (Play/Pause ikonlu) -->
+    <div class="absolute top-6 left-6 z-20">
+        <button id="audioToggleBtn" 
+                aria-label="Müziği Başlat/Durdur"
+                class="flex items-center justify-center w-12 h-12 rounded-full bg-black/40 border border-pink-500/30 text-pink-400 backdrop-blur-md shadow-[0_0_15px_rgba(255,46,147,0.2)] hover:bg-pink-500/20 hover:border-pink-400 hover:text-white transition-all cursor-pointer">
+            <!-- Üçgen Play İkonu -->
+            <svg id="playIcon" class="w-5 h-5 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z"/>
+            </svg>
+            <!-- Çift Çizgi Pause İkonu (Başlangıçta gizli) -->
+            <svg id="pauseIcon" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+            </svg>
+        </button>
+    </div>
 
-    <!-- Merkezdeki Beyaz Düğme -->
+    <!-- Merkezdeki Başlat Tetikleyicisi -->
     <div id="startContainer" class="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
         <button id="startBtn" 
                 aria-label="Animasyonu Başlat"
@@ -102,18 +122,27 @@
         </button>
     </div>
 
-    <!-- Yerel Ses Dosyası Oynatıcı (GitHub Pages uyumlu yol) -->
+    <!-- Yerel Ses Dosyası Oynatıcı -->
     <audio id="bgAudio" preload="auto" loop>
         <source src="./melody.m4a" type="audio/mp4">
         <source src="melody.m4a" type="audio/mp4">
     </audio>
 
     <!-- Çarpışma Sonrası Tekrar Oynat Düğmesi -->
-    <div id="replayContainer" class="absolute bottom-10 inset-x-0 flex justify-center z-10 opacity-0 pointer-events-none transition-opacity duration-700">
+    <div id="replayContainer" class="absolute bottom-20 inset-x-0 flex justify-center z-10 opacity-0 pointer-events-none transition-opacity duration-700">
         <button id="replayBtn" 
                 class="white-trigger-btn px-8 py-3 rounded-full font-semibold text-sm sm:text-base tracking-wider uppercase cursor-pointer">
             Tekrar İzle
         </button>
+    </div>
+
+    <!-- Sondaki Sadece TV Girl Yazılı Neon Açıklama -->
+    <div class="absolute bottom-6 inset-x-0 flex justify-center z-10 pointer-events-none px-4">
+        <p class="text-center text-xs sm:text-sm tracking-wider font-light drop-shadow-[0_0_15px_rgba(255,46,147,0.7)]">
+            <span class="text-pink-400 font-semibold drop-shadow-[0_0_8px_rgba(255,46,147,0.8)]">Cigarettes out the window</span> 
+            <span class="text-white/60 mx-2">—</span> 
+            <span class="text-blue-400 font-semibold drop-shadow-[0_0_8px_rgba(0,80,208,0.8)]">TV Girl</span>
+        </p>
     </div>
 
     <!-- Animasyon Kanvası -->
@@ -129,8 +158,8 @@
         const replayContainer = document.getElementById('replayContainer');
         const bgAudio = document.getElementById('bgAudio');
         const audioToggleBtn = document.getElementById('audioToggleBtn');
-        const playIconSvg = document.getElementById('playIconSvg');
-        const pauseIconSvg = document.getElementById('pauseIconSvg');
+        const playIcon = document.getElementById('playIcon');
+        const pauseIcon = document.getElementById('pauseIcon');
 
         // GitHub Pages ses kaynağını kesinleştirmek için mutlak/göreli adres kontrolü
         try {
@@ -156,7 +185,7 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Animasyon Durumları (Çarpışma süresi tam 9 saniye)
+        // Animasyon Durumları
         const STATE = {
             IDLE: 0,
             APPROACHING: 1, 
@@ -165,7 +194,7 @@
         };
 
         let currentState = STATE.IDLE;
-        let totalParticles = 100;      // Performans optimizasyonlu 100 parçacık
+        let totalParticles = 100;
 
         let leftEye = {
             x: width * 0.15,
@@ -185,6 +214,12 @@
         let shockwaves = [];
         let flashAlpha = 0;
         let animStartTime = 0;
+        let isFirstPlay = true;
+
+        // Zamanı durdurma/devam ettirme (pause/resume) için sayaçlar
+        let isPaused = false;
+        let pausedElapsed = 0;
+        let pauseTimestamp = 0;
 
         function resetPositions() {
             leftEye.x = width * 0.15;
@@ -193,65 +228,86 @@
             rightEye.y = height * 0.5;
         }
 
-        // Ses İkonlarını Güncelleme Fonksiyonu
-        function updateAudioButtonUI(isPlaying) {
-            if (isPlaying) {
-                playIconSvg.classList.add('hidden');
-                pauseIconSvg.classList.remove('hidden');
+        function updateAudioButtonIcons() {
+            if (bgAudio.paused && (currentState === STATE.IDLE || isPaused)) {
+                playIcon.classList.remove('hidden');
+                pauseIcon.classList.add('hidden');
             } else {
-                playIconSvg.classList.remove('hidden');
-                pauseIconSvg.classList.add('hidden');
+                playIcon.classList.add('hidden');
+                pauseIcon.classList.remove('hidden');
             }
         }
 
-        // Ses Oynat / Durdur Toggle Kontrolü
+        /**
+         * Sol üst köşe tuşu: Hem müziği hem animasyonu durdurur / başlatır
+         */
         audioToggleBtn.addEventListener('click', () => {
-            if (bgAudio.paused) {
-                bgAudio.play().then(() => {
-                    updateAudioButtonUI(true);
-                }).catch(e => {
-                    console.log("Ses oynatılamadı:", e);
-                });
-            } else {
+            if (isFirstPlay) {
+                // Eğer henüz başlanmadıysa direkt başlat tetikleyicisini çalıştır
+                handleTriggerAction();
+                return;
+            }
+
+            if (!isPaused) {
+                // Durdur (Pause)
+                isPaused = true;
                 bgAudio.pause();
-                updateAudioButtonUI(false);
+                pauseTimestamp = performance.now();
+                playIcon.classList.remove('hidden');
+                pauseIcon.classList.add('hidden');
+            } else {
+                // Devam Ettir (Resume)
+                isPaused = false;
+                bgAudio.play().catch(e => console.log("Ses devam ettirilemedi:", e));
+                animStartTime += (performance.now() - pauseTimestamp);
+                playIcon.classList.add('hidden');
+                pauseIcon.classList.remove('hidden');
             }
         });
 
         /**
-         * Animasyonu ve Müziği Başlatır
+         * Başlat Tetikleyicisi İşlevselliği
          */
-        function startSequence() {
-            startBtn.classList.add('hidden-btn');
-            startContainer.classList.add('pointer-events-none');
+        function handleTriggerAction() {
+            if (isFirstPlay) {
+                isFirstPlay = false;
+                isPaused = false;
+                startContainer.classList.add('opacity-0', 'pointer-events-none');
 
-            replayContainer.classList.remove('opacity-100', 'pointer-events-auto');
-            replayContainer.classList.add('opacity-0', 'pointer-events-none');
-            
-            audioToggleBtn.classList.remove('opacity-0');
+                replayContainer.classList.remove('opacity-100', 'pointer-events-auto');
+                replayContainer.classList.add('opacity-0', 'pointer-events-none');
 
-            // Müziği baştan çal
-            if (bgAudio) {
-                bgAudio.currentTime = 0;
-                bgAudio.play().then(() => {
-                    updateAudioButtonUI(true);
-                }).catch(e => {
-                    console.log("GitHub Pages Otomatik Oynatma Engeli:", e);
-                    updateAudioButtonUI(false);
-                });
+                if (bgAudio) {
+                    bgAudio.currentTime = 0;
+                    bgAudio.play().catch(e => console.log("Otomatik oynatma engeli:", e));
+                    updateAudioButtonIcons();
+                }
+
+                dustParticles = [];
+                shockwaves = [];
+                flashAlpha = 0;
+                resetPositions();
+
+                currentState = STATE.APPROACHING;
+                animStartTime = performance.now();
             }
-
-            dustParticles = [];
-            shockwaves = [];
-            flashAlpha = 0;
-            resetPositions();
-
-            currentState = STATE.APPROACHING;
-            animStartTime = performance.now();
         }
 
-        startBtn.addEventListener('click', startSequence);
-        replayBtn.addEventListener('click', startSequence);
+        startBtn.addEventListener('click', handleTriggerAction);
+
+        replayBtn.addEventListener('click', () => {
+            isFirstPlay = true;
+            isPaused = false;
+            startContainer.classList.remove('opacity-0', 'pointer-events-none');
+            replayContainer.classList.remove('opacity-100', 'pointer-events-auto');
+            replayContainer.classList.add('opacity-0', 'pointer-events-none');
+            currentState = STATE.IDLE;
+            if (bgAudio) {
+                bgAudio.pause();
+                bgAudio.currentTime = 0;
+                updateAudioButtonIcons();
+            }
+        });
 
         /**
          * Çarpışma anında toz parçacıkları oluşturur
@@ -411,6 +467,11 @@
                 let idleY = height * 0.5 + Math.sin(time) * 8;
                 drawLashEye(width * 0.15, idleY, 1.0, 0);
                 drawFlatEye(width * 0.85, idleY, 1.0, Math.PI);
+                return;
+            }
+
+            // Eğer durdurulduysa (paused), animasyon karesini dondur
+            if (isPaused) {
                 return;
             }
 
