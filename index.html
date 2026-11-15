@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karanlık Neon Gözlerin Kavuşması</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #020205;
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Merkezdeki beyaz başlangıç düğmesi */
+        .white-trigger-btn {
+            background: #ffffff;
+            color: #020205;
+            box-shadow: 0 0 25px rgba(255, 255, 255, 0.35), 0 0 60px rgba(255, 255, 255, 0.15);
+            transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), 
+                        box-shadow 0.35s ease, 
+                        opacity 0.4s ease;
+        }
+
+        .white-trigger-btn:hover {
+            transform: scale(1.07);
+            box-shadow: 0 0 35px rgba(255, 255, 255, 0.65), 0 0 80px rgba(255, 255, 255, 0.25);
+        }
+
+        .white-trigger-btn:active {
+            transform: scale(0.96);
+        }
+
+        .hidden-btn {
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(0.85);
+        }
+
+        /* Tekrar oynat düğmesi */
+        .replay-btn {
+            background: rgba(10, 12, 22, 0.75);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(190, 20, 110, 0.4);
+            color: rgba(255, 255, 255, 0.85);
+            box-shadow: 0 0 18px rgba(160, 10, 90, 0.25), inset 0 0 12px rgba(0, 60, 180, 0.2);
+            transition: all 0.35s ease;
+        }
+
+        .replay-btn:hover {
+            background: rgba(20, 24, 42, 0.9);
+            color: #ffffff;
+            border-color: rgba(0, 95, 230, 0.7);
+            box-shadow: 0 0 24px rgba(0, 95, 230, 0.4);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body class="relative flex items-center justify-center">
+
+    <!-- Ana Animasyon Kanvası -->
+    <canvas id="sceneCanvas"></canvas>
+
+    <!-- Merkezdeki Beyaz Düğme -->
+    <div id="startContainer" class="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+        <button id="startBtn" 
+                aria-label="Animasyonu Başlat"
+                class="white-trigger-btn pointer-events-auto px-10 py-4 rounded-full font-semibold text-base sm:text-lg tracking-wider uppercase cursor-pointer">
+            Başlat
+        </button>
+    </div>
+
+    <!-- Çarpışma Sonrası Tekrar Oynat Düğmesi -->
+    <div id="replayContainer" class="absolute bottom-10 inset-x-0 flex justify-center z-10 opacity-0 pointer-events-none transition-opacity duration-700">
+        <button id="replayBtn" 
+                class="replay-btn px-6 py-2.5 rounded-full text-sm font-medium tracking-wide flex items-center gap-2 cursor-pointer">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                <path d="M3 3v5h5"/>
+            </svg>
+            Tekrar İzle
+        </button>
+    </div>
+
+    <script>
+        /**
+         * Karanlık Neon Kirpikli Göz (Pembe) ve Düz Göz (Mavi)
+         * Birbirine Bakarak Yaklaşma, Son Anda Sarılma ve 500 Parçacıklı Toz Dağılımı
+         */
+        const canvas = document.getElementById('sceneCanvas');
+        const ctx = canvas.getContext('2d');
+        const startBtn = document.getElementById('startBtn');
+        const startContainer = document.getElementById('startContainer');
+        const replayBtn = document.getElementById('replayBtn');
+        const replayContainer = document.getElementById('replayContainer');
+
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+        let dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+        // Karanlık ama Parlak Neon Renk Paleti
+        const COLORS = {
+            bg: '#020205',
+            // Karanlık Neon Pembe (Kirpikli Göz)
+            darkNeonPinkCore: '#e60073',
+            darkNeonPinkFill: '#59002d',
+            darkNeonPinkEdge: '#ff1a8c',
+            darkNeonPinkGlow: 'rgba(215, 0, 108, 0.88)',
+            darkPinkDust: ['#99004d', '#c20061', '#e60073', '#6b0036', '#ff1a8c'],
+
+            // Karanlık Neon Mavi (Düz Göz)
+            darkNeonBlueCore: '#0066ff',
+            darkNeonBlueFill: '#001d57',
+            darkNeonBlueEdge: '#1a8cff',
+            darkNeonBlueGlow: 'rgba(0, 88, 235, 0.88)',
+            darkBlueDust: ['#003594', '#004ecc', '#0066ff', '#002266', '#1a8cff']
+        };
+
+        const STATE = {
+            IDLE: 'IDLE',
+            APPROACHING: 'APPROACHING',
+            SHATTERED: 'SHATTERED'
+        };
+
+        let currentState = STATE.IDLE;
+        let animStartTime = 0;
+        const APPROACH_DURATION = 2600;
+
+        let bgStars = [];
+        let dustParticles = [];
+        let shockwaves = [];
+        let flashAlpha = 0;
+        let shakeIntensity = 0;
+
+        // Soldaki Pembe Kirpikli Göz
+        const pinkEyeObj = {
+            x: 0,
+            y: 0,
+            startX: 0,
+            radius: 44,
+            trail: []
+        };
+
+        // Sağdaki Mavi Düz Göz
+        const blueEyeObj = {
+            x: 0,
+            y: 0,
+            startX: 0,
+            radius: 44,
+            trail: []
+        };
+
+        /**
+         * Arka plandaki çok hafif uzay noktalarını oluşturur
+         */
+        function initBackgroundStars() {
+            bgStars = [];
+            const count = Math.floor((width * height) / 16000);
+            for (let i = 0; i < count; i++) {
+                bgStars.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    size: Math.random() * 1.3 + 0.3,
+                    alpha: Math.random() * 0.28 + 0.04,
+                    twinkleSpeed: Math.random() * 0.003 + 0.001,
+                    phase: Math.random() * Math.PI * 2
+                });
+            }
+        }
+
+        /**
+         * İki gözün başlangıç konumlarını ayarlar
+         */
+        function resetPositions() {
+            const margin = Math.max(pinkEyeObj.radius * 2.4, width * 0.14);
+            pinkEyeObj.startX = margin;
+            blueEyeObj.startX = width - margin;
+
+            pinkEyeObj.x = pinkEyeObj.startX;
+            pinkEyeObj.y = height / 2;
+            pinkEyeObj.trail = [];
+
+            blueEyeObj.x = blueEyeObj.startX;
+            blueEyeObj.y = height / 2;
+            blueEyeObj.trail = [];
+        }
+
+        /**
+         * Kanvas boyutlarını pencereye göre uyarlar
+         */
+        function resizeCanvas() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            const baseRadius = Math.max(30, Math.min(50, Math.min(width, height) * 0.075));
+            pinkEyeObj.radius = baseRadius;
+            blueEyeObj.radius = baseRadius;
+
+            initBackgroundStars();
+
+            if (currentState === STATE.IDLE) {
+                resetPositions();
+            }
+        }
+
+        /**
+         * Yavaştan başlayıp aniden hızlanan eğri
+         */
+        function slowThenSuddenBurstEase(t) {
+            return Math.pow(t, 4.0);
+        }
+
+        /**
+         * Çarpışmadan hemen önceki milisaniyelerde uzanan sarılma kollarını çizer
+         * @param {number} hugProgress 0 ile 1 arası kol açılma oranı
+         * @param {number} dir 1 = sağa (pembe), -1 = sola (mavi)
+         */
+        function drawHuggingArms(ctx, radius, hugProgress, dir, edgeColor, glowColor) {
+            if (hugProgress <= 0.01) return;
+
+            ctx.save();
+            ctx.strokeStyle = edgeColor;
+            ctx.shadowColor = glowColor;
+            ctx.shadowBlur = 22;
+            ctx.lineWidth = Math.max(3, radius * 0.085);
+            ctx.lineCap = 'round';
+            ctx.globalAlpha = Math.min(1, hugProgress * 1.4);
+
+            // Kolların uzanma mesafesi ve sarılma kavisi
+            const reachX = dir * radius * (0.95 + hugProgress * 1.15);
+            const spreadY = radius * (0.68 - hugProgress * 0.22);
+            const curlX = dir * radius * (0.75 + hugProgress * 1.35);
+
+            // Üst Sarılma Kolu
+            ctx.beginPath();
+            ctx.moveTo(dir * radius * 0.65, -radius * 0.22);
+            ctx.quadraticCurveTo(
+                curlX,
+                -spreadY * 1.25,
+                reachX,
+                -spreadY * 0.35
+            );
+            ctx.stroke();
+
+            // Alt Sarılma Kolu
+            ctx.beginPath();
+            ctx.moveTo(dir * radius * 0.65, radius * 0.22);
+            ctx.quadraticCurveTo(
+                curlX,
+                spreadY * 1.25,
+                reachX,
+                spreadY * 0.35
+            );
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        /**
+         * Karanlık Neon Göz Çizimi (Kirpikli veya Düz, İris ve Göz Bebeği Odaklı)
+         */
+        function drawNeonEye(ctx, x, y, radius, options) {
+            const {
+                hasLashes,
+                lookDir,      // 1 = sağa bakar, -1 = sola bakar
+                hugProgress,  // 0..1 arası sarılma kolu animasyonu
+                stretchX,
+                coreColor,
+                fillColor,
+                edgeColor,
+                glowColor
+            } = options;
+
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.scale(stretchX, 1 / Math.sqrt(stretchX));
+
+            // 1. Önce sarılma kollarını çiz (çarpışmadan milisaniyeler önce belirir)
+            drawHuggingArms(ctx, radius, hugProgress, lookDir, edgeColor, glowColor);
+
+            const eyeW = radius * 1.35;
+            const eyeH = radius * 0.78;
+
+            // 2. Göz dış badem formu
+            ctx.shadowColor = glowColor;
+            ctx.shadowBlur = 32;
+
+            ctx.beginPath();
+            ctx.moveTo(-eyeW, 0);
+            ctx.quadraticCurveTo(0, -eyeH * 1.35, eyeW, 0);
+            ctx.quadraticCurveTo(0, eyeH * 1.35, -eyeW, 0);
+            ctx.closePath();
+
+            const bgGrad = ctx.createRadialGradient(0, 0, radius * 0.1, 0, 0, eyeW);
+            bgGrad.addColorStop(0, fillColor);
+            bgGrad.addColorStop(1, '#09030d');
+            ctx.fillStyle = bgGrad;
+            ctx.fill();
+
+            ctx.lineWidth = 2.6;
+            ctx.strokeStyle = edgeColor;
+            ctx.stroke();
+
+            // 3. Kirpikler (Sadece pembe göz için zarif yukarı kıvrımlı neon kirpikler)
+            if (hasLashes) {
+                ctx.save();
+                ctx.strokeStyle = edgeColor;
+                ctx.shadowColor = glowColor;
+                ctx.shadowBlur = 18;
+                ctx.lineWidth = 2.4;
+                ctx.lineCap = 'round';
+
+                const lashAngles = [-0.62, -0.32, 0, 0.32, 0.62];
+                lashAngles.forEach((ang, idx) => {
+                    const t = (idx + 1) / (lashAngles.length + 1);
+                    // Badem eğrisi üzerindeki başlangıç noktası
+                    const lx = -eyeW + 2 * eyeW * t;
+                    const normX = lx / eyeW;
+                    const ly = -eyeH * 0.68 * (1 - normX * normX);
+
+                    const lashLen = radius * (idx === 2 ? 0.42 : 0.35);
+                    const tipX = lx + Math.sin(ang) * lashLen * 0.9;
+                    const tipY = ly - Math.cos(ang) * lashLen;
+
+                    ctx.beginPath();
+                    ctx.moveTo(lx, ly);
+                    ctx.quadraticCurveTo(
+                        lx + Math.sin(ang) * lashLen * 0.3,
+                        ly - lashLen * 0.6,
+                        tipX,
+                        tipY
+                    );
+                    ctx.stroke();
+                });
+                ctx.restore();
+            }
+
+            // 4. Göz içine kırpılmış İris ve Göz Bebeği (Birbirine kilitlenmiş bakış)
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(-eyeW, 0);
+            ctx.quadraticCurveTo(0, -eyeH * 1.35, eyeW, 0);
+            ctx.quadraticCurveTo(0, eyeH * 1.35, -eyeW, 0);
+            ctx.closePath();
+            ctx.clip();
+
+            // Göz bebeğinin birbirine doğru kayma miktarı
+            const gazeOffsetX = lookDir * radius * 0.36;
+            const irisRadius = radius * 0.46;
+
+            // Parlayan Neon İris
+            const irisGrad = ctx.createRadialGradient(
+                gazeOffsetX, 0, irisRadius * 0.15,
+                gazeOffsetX, 0, irisRadius
+            );
+            irisGrad.addColorStop(0, edgeColor);
+            irisGrad.addColorStop(0.65, coreColor);
+            irisGrad.addColorStop(1, fillColor);
+
+            ctx.beginPath();
+            ctx.arc(gazeOffsetX, 0, irisRadius, 0, Math.PI * 2);
+            ctx.fillStyle = irisGrad;
+            ctx.fill();
+
+            ctx.lineWidth = 1.8;
+            ctx.strokeStyle = edgeColor;
+            ctx.stroke();
+
+            // Karanlık Göz Bebeği
+            ctx.beginPath();
+            ctx.arc(gazeOffsetX + lookDir * 2, 0, irisRadius * 0.44, 0, Math.PI * 2);
+            ctx.fillStyle = '#030108';
+            ctx.fill();
+
+            // Göz içi neon ışık yansıması (birbirine bakarken parlayan nokta)
+            ctx.beginPath();
+            ctx.arc(
+                gazeOffsetX + lookDir * irisRadius * 0.28,
+                -irisRadius * 0.25,
+                irisRadius * 0.16,
+                0,
+                Math.PI * 2
+            );
+            ctx.fillStyle = edgeColor;
+            ctx.fill();
+
+            ctx.restore();
+            ctx.restore();
+        }
+
+        /**
+         * Sarılma anında her iki gözü 500 adet karanlık neon toz taneciğine dönüştürür
+         */
+        function triggerShatterIntoDust(impactX, impactY) {
+            currentState = STATE.SHATTERED;
+            shakeIntensity = 15;
+            flashAlpha = 0.6;
+            dustParticles = [];
+            shockwaves = [];
+
+            // Sarılma & toz olma anı karanlık neon şok dalgaları
+            shockwaves.push({
+                x: impactX,
+                y: impactY,
+                radius: 6,
+                maxRadius: Math.min(width, height) * 0.44,
+                alpha: 0.85,
+                color: '#e60073',
+                lineWidth: 3.5
+            });
+            shockwaves.push({
+                x: impactX,
+                y: impactY,
+                radius: 3,
+                maxRadius: Math.min(width, height) * 0.34,
+                alpha: 0.9,
+                color: '#0066ff',
+                lineWidth: 2.5
+            });
+
+            // Toplam 500 parçacık (250 karanlık neon pembe + 250 karanlık neon mavi)
+            const totalParticles = 500;
+
+            for (let i = 0; i < totalParticles; i++) {
+                const isPink = i < totalParticles / 2;
+                const palette = isPink ? COLORS.darkPinkDust : COLORS.darkBlueDust;
+                const color = palette[Math.floor(Math.random() * palette.length)];
+
+                const spreadAngle = Math.random() * Math.PI * 2;
+                const spreadDist = Math.random() * (pinkEyeObj.radius * 0.78);
+                const startX = impactX + Math.cos(spreadAngle) * spreadDist + (isPink ? -6 : 6);
+                const startY = impactY + Math.sin(spreadAngle) * spreadDist;
+
+                const burstAngle = Math.random() * Math.PI * 2;
+                const isFineMist = Math.random() > 0.35;
+                const speed = isFineMist
+                    ? (Math.random() * 5.8 + 0.45)
+                    : (Math.random() * 13.5 + 3.5);
+
+                dustParticles.push({
+                    x: startX,
+                    y: startY,
+                    vx: Math.cos(burstAngle) * speed,
+                    vy: Math.sin(burstAngle) * speed,
+                    size: isFineMist ? (Math.random() * 2.0 + 0.7) : (Math.random() * 3.1 + 1.2),
+                    color: color,
+                    alpha: Math.random() * 0.35 + 0.65,
+                    drag: isFineMist ? (0.955 + Math.random() * 0.025) : (0.93 + Math.random() * 0.03),
+                    gravity: (Math.random() - 0.48) * 0.015,
+                    turbulencePhase: Math.random() * Math.PI * 2,
+                    turbulenceSpeed: Math.random() * 0.03 + 0.01,
+                    decay: Math.random() * 0.0032 + 0.0018
+                });
+            }
+
+            setTimeout(() => {
+                if (currentState === STATE.SHATTERED) {
+                    replayContainer.classList.remove('opacity-0', 'pointer-events-none');
+                    replayContainer.classList.add('opacity-100', 'pointer-events-auto');
+                }
+            }, 2200);
+        }
+
+        /**
+         * Animasyonu başlatır
+         */
+        function startSequence() {
+            startBtn.classList.add('hidden-btn');
+            startContainer.classList.add('pointer-events-none');
+
+            replayContainer.classList.remove('opacity-100', 'pointer-events-auto');
+            replayContainer.classList.add('opacity-0', 'pointer-events-none');
+
+            dustParticles = [];
+            shockwaves = [];
+            flashAlpha = 0;
+            resetPositions();
+
+            currentState = STATE.APPROACHING;
+            animStartTime = performance.now();
+        }
+
+        /**
+         * Ana Render Döngüsü (60 FPS)
+         */
+        function render(now) {
+            requestAnimationFrame(render);
+
+            ctx.fillStyle = COLORS.bg;
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.save();
+
+            // Çarpışma anı ekran sarsıntısı
+            if (shakeIntensity > 0.1) {
+                const dx = (Math.random() - 0.5) * shakeIntensity;
+                const dy = (Math.random() - 0.5) * shakeIntensity;
+                ctx.translate(dx, dy);
+                shakeIntensity *= 0.86;
+            }
+
+            // Arka plan uzay noktaları
+            for (let i = 0; i < bgStars.length; i++) {
+                const s = bgStars[i];
+                const twinkle = Math.sin(now * s.twinkleSpeed + s.phase) * 0.1;
+                ctx.fillStyle = `rgba(200, 215, 255, ${Math.max(0.02, s.alpha + twinkle)})`;
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // DURUM 1: YAKLAŞMA VE SON ANDA SARILMA
+            if (currentState === STATE.APPROACHING) {
+                const elapsed = now - animStartTime;
+                const rawProgress = Math.min(elapsed / APPROACH_DURATION, 1);
+                const eased = slowThenSuddenBurstEase(rawProgress);
+
+                const centerX = width / 2;
+                const collisionOffset = pinkEyeObj.radius * 0.65;
+
+                const targetPinkX = centerX - collisionOffset;
+                const targetBlueX = centerX + collisionOffset;
+
+                const prevPinkX = pinkEyeObj.x;
+
+                pinkEyeObj.x = pinkEyeObj.startX + (targetPinkX - pinkEyeObj.startX) * eased;
+                blueEyeObj.x = blueEyeObj.startX + (targetBlueX - blueEyeObj.startX) * eased;
+
+                const velocity = Math.abs(pinkEyeObj.x - prevPinkX);
+                const stretch = 1 + Math.min(velocity * 0.011, 0.42);
+
+                // Tam çarpışmaya milisaniyeler kala (son %14'lük dilimde) kollar çıkıp sarılmaya çalışır
+                const hugStartThreshold = 0.86;
+                const hugProgress = rawProgress > hugStartThreshold
+                    ? Math.min(1, (rawProgress - hugStartThreshold) / (1 - hugStartThreshold))
+                    : 0;
+
+                if (velocity > 1.5) {
+                    pinkEyeObj.trail.push({ x: pinkEyeObj.x, y: pinkEyeObj.y, alpha: 0.38 });
+                    blueEyeObj.trail.push({ x: blueEyeObj.x, y: blueEyeObj.y, alpha: 0.38 });
+                }
+
+                // Karanlık neon hareket izleri
+                for (let i = pinkEyeObj.trail.length - 1; i >= 0; i--) {
+                    const t = pinkEyeObj.trail[i];
+                    t.alpha -= 0.045;
+                    if (t.alpha <= 0) {
+                        pinkEyeObj.trail.splice(i, 1);
+                        continue;
+                    }
+                    ctx.save();
+                    ctx.globalAlpha = t.alpha * 0.4;
+                    drawNeonEye(ctx, t.x, t.y, pinkEyeObj.radius * 0.92, {
+                        hasLashes: true,
+                        lookDir: 1,
+                        hugProgress: 0,
+                        stretchX: 1,
+                        coreColor: COLORS.darkNeonPinkCore,
+                        fillColor: COLORS.darkNeonPinkFill,
+                        edgeColor: COLORS.darkNeonPinkEdge,
+                        glowColor: COLORS.darkNeonPinkGlow
+                    });
+                    ctx.restore();
+                }
+
+                for (let i = blueEyeObj.trail.length - 1; i >= 0; i--) {
+                    const t = blueEyeObj.trail[i];
+                    t.alpha -= 0.045;
+                    if (t.alpha <= 0) {
+                        blueEyeObj.trail.splice(i, 1);
+                        continue;
+                    }
+                    ctx.save();
+                    ctx.globalAlpha = t.alpha * 0.4;
+                    drawNeonEye(ctx, t.x, t.y, blueEyeObj.radius * 0.92, {
+                        hasLashes: false,
+                        lookDir: -1,
+                        hugProgress: 0,
+                        stretchX: 1,
+                        coreColor: COLORS.darkNeonBlueCore,
+                        fillColor: COLORS.darkNeonBlueFill,
+                        edgeColor: COLORS.darkNeonBlueEdge,
+                        glowColor: COLORS.darkNeonBlueGlow
+                    });
+                    ctx.restore();
+                }
+
+                const fadeIn = Math.min(elapsed / 350, 1);
+                ctx.save();
+                ctx.globalAlpha = fadeIn;
+
+                // Soldaki Kirpikli Pembe Göz (Sağa doğru mavi göze bakar ve kollarını açar)
+                drawNeonEye(ctx, pinkEyeObj.x, pinkEyeObj.y, pinkEyeObj.radius, {
+                    hasLashes: true,
+                    lookDir: 1,
+                    hugProgress: hugProgress,
+                    stretchX: stretch,
+                    coreColor: COLORS.darkNeonPinkCore,
+                    fillColor: COLORS.darkNeonPinkFill,
+                    edgeColor: COLORS.darkNeonPinkEdge,
+                    glowColor: COLORS.darkNeonPinkGlow
+                });
+
+                // Sağdaki Düz Mavi Göz (Sola doğru pembe göze bakar ve kollarını açar)
+                drawNeonEye(ctx, blueEyeObj.x, blueEyeObj.y, blueEyeObj.radius, {
+                    hasLashes: false,
+                    lookDir: -1,
+                    hugProgress: hugProgress,
+                    stretchX: stretch,
+                    coreColor: COLORS.darkNeonBlueCore,
+                    fillColor: COLORS.darkNeonBlueFill,
+                    edgeColor: COLORS.darkNeonBlueEdge,
+                    glowColor: COLORS.darkNeonBlueGlow
+                });
+
+                ctx.restore();
+
+                // Kollar birbirine kavuştuğu anda toza dönüşüm
+                if (rawProgress >= 1) {
+                    triggerShatterIntoDust(centerX, height / 2);
+                }
+            }
+
+            // DURUM 2: ÇARPIŞMA VE KARANLIK NEON TOZ DAĞILIMI
+            if (currentState === STATE.SHATTERED) {
+                if (flashAlpha > 0.01) {
+                    const flashGrad = ctx.createRadialGradient(
+                        width / 2, height / 2, 5,
+                        width / 2, height / 2, Math.min(width, height) * 0.35
+                    );
+                    flashGrad.addColorStop(0, `rgba(210, 0, 110, ${flashAlpha * 0.65})`);
+                    flashGrad.addColorStop(0.5, `rgba(0, 75, 220, ${flashAlpha * 0.45})`);
+                    flashGrad.addColorStop(1, 'rgba(2, 2, 5, 0)');
+                    ctx.fillStyle = flashGrad;
+                    ctx.fillRect(0, 0, width, height);
+                    flashAlpha *= 0.88;
+                }
+
+                // Şok dalgaları
+                for (let i = shockwaves.length - 1; i >= 0; i--) {
+                    const sw = shockwaves[i];
+                    sw.radius += (sw.maxRadius - sw.radius) * 0.11;
+                    sw.alpha *= 0.91;
+
+                    if (sw.alpha < 0.01) {
+                        shockwaves.splice(i, 1);
+                        continue;
+                    }
+
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+                    ctx.strokeStyle = sw.color;
+                    ctx.shadowColor = sw.color;
+                    ctx.shadowBlur = 16;
+                    ctx.globalAlpha = sw.alpha;
+                    ctx.lineWidth = sw.lineWidth;
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                // 500 Parçacıklı Neon Toz Bulutu
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+
+                for (let i = dustParticles.length - 1; i >= 0; i--) {
+                    const p = dustParticles[i];
+
+                    p.vx *= p.drag;
+                    p.vy *= p.drag;
+                    p.vy += p.gravity;
+
+                    p.turbulencePhase += p.turbulenceSpeed;
+                    p.x += p.vx + Math.cos(p.turbulencePhase) * 0.22;
+                    p.y += p.vy + Math.sin(p.turbulencePhase) * 0.22;
+
+                    p.alpha -= p.decay;
+
+                    if (p.alpha <= 0) {
+                        dustParticles.splice(i, 1);
+                        continue;
+                    }
+
+                    ctx.globalAlpha = Math.max(0, p.alpha * 0.35);
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size * 2.3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.globalAlpha = Math.max(0, p.alpha);
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
+
+            ctx.restore();
+        }
+
+        // Olay Dinleyicileri
+        window.addEventListener('resize', resizeCanvas);
+        startBtn.addEventListener('click', startSequence);
+        replayBtn.addEventListener('click', startSequence);
+
+        // Başlangıç kurulumu
+        resizeCanvas();
+        requestAnimationFrame(render);
+    </script>
+</body>
+</html>
